@@ -19,6 +19,12 @@ bitflags::bitflags! {
 	}
 }
 
+impl Default for TestFlags {
+	fn default() -> Self {
+		TestFlags::all()
+	}
+}
+
 #[derive(Clone)]
 pub struct Cartridge {
 	rom: Vec<u8>,
