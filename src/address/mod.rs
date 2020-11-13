@@ -1,4 +1,5 @@
 use std::convert::{TryFrom, TryInto};
+use std::fmt;
 use std::ops::{Add, BitAnd, Sub};
 
 pub mod error;
@@ -91,6 +92,18 @@ impl_from![u8, u16, Address16; Address24];
 impl_try_from![i8, i16, i32, i64, i128, u32, u64, u128; Address24];
 impl_into![u32, u64, u128; Address24];
 impl_into_usize![Address24; "32", "64"];
+
+impl fmt::Display for Address16 {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		write!(f, "${:04X}", self.0)
+	}
+}
+
+impl fmt::Display for Address24 {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		write!(f, "${:02X}:{:04X}", self.0 >> 16, self.0 as u16)
+	}
+}
 
 impl Address16 {
 	/// Creates a new `Address16` with the given `u16` value.
