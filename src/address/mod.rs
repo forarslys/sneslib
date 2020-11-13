@@ -1,4 +1,5 @@
 use std::convert::{TryFrom, TryInto};
+use std::ops::{Add, BitAnd, Sub};
 
 pub mod error;
 
@@ -125,6 +126,82 @@ impl Address16 {
 	}
 }
 
+macro_rules! impl_op {
+	($t:ident  $trait:ident:$fn:ident:$internalfn:ident $($mask:expr)?) => {
+		impl $trait<Self> for $t {
+			type Output = $t;
+			#[inline]
+			fn $fn(self, rhs: $t) -> $t {
+				let ad = self.0.$internalfn(rhs.0);
+				$t(ad $(& $mask)?)
+			}
+		}
+	};
+}
+
+macro_rules! impl_and {
+	($t:ident $prm:ident) => {
+		impl BitAnd<$prm> for $t {
+			type Output = $t;
+			#[inline]
+			fn bitand(self, rhs: $prm) -> $t {
+				$t(self.0 & rhs)
+			}
+		}
+	};
+}
+
+macro_rules! forward_ref_binop {
+	(impl $imp:ident:$method:ident for $t:ty, $u:ty) => {
+		impl<'a> $imp<$u> for &'a $t {
+			type Output = <$t as $imp<$u>>::Output;
+			#[inline]
+			fn $method(self, other: $u) -> <$t as $imp<$u>>::Output {
+				$imp::$method(*self, other)
+			}
+		}
+
+		impl<'a> $imp<&'a $u> for $t {
+			type Output = <$t as $imp<$u>>::Output;
+			#[inline]
+			fn $method(self, other: &'a $u) -> <$t as $imp<$u>>::Output {
+				$imp::$method(self, *other)
+			}
+		}
+
+		impl<'a, 'b> $imp<&'a $u> for &'b $t {
+			type Output = <$t as $imp<$u>>::Output;
+			#[inline]
+			fn $method(self, other: &'a $u) -> <$t as $imp<$u>>::Output {
+				$imp::$method(*self, *other)
+			}
+		}
+	};
+}
+
+impl_op!(Address16 Add:add:wrapping_add);
+impl_op!(Address16 Sub:sub:wrapping_sub);
+impl_and!(Address16 u16);
+impl_op!(Address24 Add:add:wrapping_add 0xFFFFFF);
+impl_op!(Address24 Sub:sub:wrapping_sub 0xFFFFFF);
+impl_and!(Address24 u32);
+
+impl Add<Address16> for Address24 {
+	type Output = Self;
+	#[inline]
+	fn add(self, rhs: Address16) -> Self::Output {
+		Self(self.0 & 0xFF0000 | (self.get_lower_address16() + rhs).0 as u32)
+	}
+}
+
+forward_ref_binop!(impl Add:add for Address16, Address16);
+forward_ref_binop!(impl Sub:sub for Address16, Address16);
+forward_ref_binop!(impl BitAnd:bitand for Address16, u16);
+forward_ref_binop!(impl Add:add for Address24, Address24);
+forward_ref_binop!(impl Sub:sub for Address24, Address24);
+forward_ref_binop!(impl BitAnd:bitand for Address24, u32);
+forward_ref_binop!(impl Add:add for Address24, Address16);
+
 impl Address24 {
 	/// Creates a new `Address24` with the given `u32` value truncating the highest 8-bit.
 	/// ```
@@ -210,5 +287,45 @@ mod test {
 		assert_eq!(Address24::try_from(-0xFFFFFFi32), Err(TryFromIntError));
 		assert_eq!(Into::<usize>::into(Address24(0x123456)), 0x123456usize);
 		assert_eq!(Address24::from(Address16(0x1234)), Address24(0x1234));
+	}
+
+	#[test]
+	fn ops() {
+		let a = Address16::new(0x1234);
+		let b = Address16::new(0x4321);
+		assert_eq!(a + b, Address16::new(0x5555));
+		assert_eq!(&a + b, Address16::new(0x5555));
+		assert_eq!(a + &b, Address16::new(0x5555));
+		assert_eq!(&a + &b, Address16::new(0x5555));
+		assert_eq!(a - b, Address16::new(0xCF13));
+		assert_eq!(&a - b, Address16::new(0xCF13));
+		assert_eq!(a - &b, Address16::new(0xCF13));
+		assert_eq!(&a - &b, Address16::new(0xCF13));
+		assert_eq!(a & 0x5555, Address16::new(0x1014));
+		assert_eq!(&a & 0x5555, Address16::new(0x1014));
+		assert_eq!(a & &0x5555, Address16::new(0x1014));
+		assert_eq!(&a & &0x5555, Address16::new(0x1014));
+
+		let a = Address24::new(0x123456);
+		let b = Address24::new(0x654321);
+		assert_eq!(a + b, Address24::new(0x777777));
+		assert_eq!(&a + b, Address24::new(0x777777));
+		assert_eq!(a + &b, Address24::new(0x777777));
+		assert_eq!(&a + &b, Address24::new(0x777777));
+		assert_eq!(a - b, Address24::new(0xACF135));
+		assert_eq!(&a - b, Address24::new(0xACF135));
+		assert_eq!(a - &b, Address24::new(0xACF135));
+		assert_eq!(&a - &b, Address24::new(0xACF135));
+		assert_eq!(a & 0x555555, Address24::new(0x101454));
+		assert_eq!(&a & 0x555555, Address24::new(0x101454));
+		assert_eq!(a & &0x555555, Address24::new(0x101454));
+		assert_eq!(&a & &0x555555, Address24::new(0x101454));
+
+		let a = Address24::new(0x7EFF00);
+		let b = Address16::new(0x200);
+		assert_eq!(a + b, Address24::new(0x7E0100));
+		assert_eq!(&a + b, Address24::new(0x7E0100));
+		assert_eq!(a + &b, Address24::new(0x7E0100));
+		assert_eq!(&a + &b, Address24::new(0x7E0100));
 	}
 }
