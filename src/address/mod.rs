@@ -126,6 +126,63 @@ impl Address16 {
 	}
 }
 
+impl Address24 {
+	/// Creates a new `Address24` with the given `u32` value truncating the highest 8-bit.
+	/// ```
+	/// # use sneslib::address::*;
+	/// let addr = Address24::new(0x12345678);
+	/// assert_eq!(addr, Address24::new(0x345678));
+	/// ```
+	#[inline]
+	pub fn new(address: u32) -> Self {
+		Address24(address & 0xFFFFFF)
+	}
+
+	/// Returns a low byte of the address.
+	/// ```
+	/// # use sneslib::address::*;
+	/// let addr = Address24::new(0x123456);
+	/// assert_eq!(addr.low(), 0x56);
+	/// ```
+	#[inline]
+	pub fn low(&self) -> u8 {
+		(self.0 & 0xFF) as u8
+	}
+
+	/// Returns a middle byte of the address.
+	/// ```
+	/// # use sneslib::address::*;
+	/// let addr = Address24::new(0x123456);
+	/// assert_eq!(addr.middle(), 0x34);
+	/// ```
+	#[inline]
+	pub fn middle(&self) -> u8 {
+		(self.0 >> 8) as u8
+	}
+
+	/// Returns a high byte of the address.
+	/// ```
+	/// # use sneslib::address::*;
+	/// let addr = Address24::new(0x123456);
+	/// assert_eq!(addr.high(), 0x12);
+	/// ```
+	#[inline]
+	pub fn high(&self) -> u8 {
+		(self.0 >> 16) as u8
+	}
+
+	/// Returns a lower 16-bit of the address.
+	/// ```
+	/// # use sneslib::address::*;
+	/// let addr = Address24::new(0x123456);
+	/// assert_eq!(addr.get_lower_address16(), Address16::new(0x3456));
+	/// ```
+	#[inline]
+	pub fn get_lower_address16(&self) -> Address16 {
+		Address16(self.0 as u16)
+	}
+}
+
 macro_rules! impl_op {
 	($t:ident  $trait:ident:$fn:ident:$internalfn:ident $($mask:expr)?) => {
 		impl $trait<Self> for $t {
@@ -201,67 +258,6 @@ forward_ref_binop!(impl Add:add for Address24, Address24);
 forward_ref_binop!(impl Sub:sub for Address24, Address24);
 forward_ref_binop!(impl BitAnd:bitand for Address24, u32);
 forward_ref_binop!(impl Add:add for Address24, Address16);
-
-impl Address24 {
-	/// Creates a new `Address24` with the given `u32` value truncating the highest 8-bit.
-	/// ```
-	/// # use sneslib::address::*;
-	/// let addr = Address24::new(0x12345678);
-	/// assert_eq!(addr, Address24::new(0x345678));
-	/// ```
-	#[inline]
-	pub fn new(address: u32) -> Self {
-		Address24(address & 0xFFFFFF)
-	}
-
-	/// Returns a low byte of the address.
-	/// ```
-	/// # use sneslib::address::*;
-	/// # use std::convert::TryFrom;
-	/// let addr = Address24::try_from(0x123456u32).unwrap();
-	/// assert_eq!(addr.low(), 0x56);
-	/// ```
-	#[inline]
-	pub fn low(&self) -> u8 {
-		(self.0 & 0xFF) as u8
-	}
-
-	/// Returns a middle byte of the address.
-	/// ```
-	/// # use sneslib::address::*;
-	/// # use std::convert::TryFrom;
-	/// let addr = Address24::try_from(0x123456u32).unwrap();
-	/// assert_eq!(addr.middle(), 0x34);
-	/// ```
-	#[inline]
-	pub fn middle(&self) -> u8 {
-		(self.0 >> 8) as u8
-	}
-
-	/// Returns a high byte of the address.
-	/// ```
-	/// # use sneslib::address::*;
-	/// # use std::convert::TryFrom;
-	/// let addr = Address24::try_from(0x123456u32).unwrap();
-	/// assert_eq!(addr.high(), 0x12);
-	/// ```
-	#[inline]
-	pub fn high(&self) -> u8 {
-		(self.0 >> 16) as u8
-	}
-
-	/// Returns a lower 16-bit of the address.
-	/// ```
-	/// # use sneslib::address::*;
-	/// # use std::convert::TryFrom;
-	/// let addr = Address24::try_from(0x123456u32).unwrap();
-	/// assert_eq!(addr.get_lower_address16(), Address16::new(0x3456u16));
-	/// ```
-	#[inline]
-	pub fn get_lower_address16(&self) -> Address16 {
-		Address16(self.0 as u16)
-	}
-}
 
 #[cfg(test)]
 mod test {
