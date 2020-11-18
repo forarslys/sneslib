@@ -85,7 +85,7 @@ macro_rules! impl_into_usize {
 
 impl_from![u8, u16; Address16];
 impl_try_from![i8, i16, i32, i64, i128, u32, u64, u128; Address16];
-impl_into![u32, u64, u128; Address16];
+impl_into![u16, u32, u64, u128; Address16];
 impl_into_usize![Address16; "32", "64"];
 
 impl_from![u8, u16, Address16; Address24];
