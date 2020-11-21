@@ -35,9 +35,10 @@ impl Default for TestFlags {
 	}
 }
 
+#[derive(Clone)]
 pub struct Cartridge {
-	rom: Vec<u8>,
-	passed: TestFlags,
+	pub(crate) rom: Vec<u8>,
+	pub(crate) passed: TestFlags,
 }
 
 impl Cartridge {
