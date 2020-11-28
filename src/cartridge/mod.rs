@@ -35,6 +35,11 @@ impl Default for TestFlags {
 	}
 }
 
+pub enum ROMType {
+	LoROM,
+	HiROM,
+}
+
 #[derive(Clone)]
 pub struct Cartridge {
 	pub(crate) rom: Vec<u8>,
@@ -122,6 +127,22 @@ impl Cartridge {
 		let flag_country = test!(test_country 0x7FD9, COUNTRY_LO, COUNTRY_HI);
 
 		flag_size | flag_checksum | flag_rommakeup | flag_chipset | flag_country
+	}
+
+	pub fn get_header_rom_size(&self, hint: Option<ROMType>) -> Option<u8> {
+		match hint {
+			Some(ROMType::LoROM) => self.rom.get(0x7FD7).cloned(),
+			Some(ROMType::HiROM) => self.rom.get(0xFFD7).cloned(),
+			None => None,
+		}
+	}
+
+	pub fn get_header_ram_size(&self, hint: Option<ROMType>) -> Option<u8> {
+		match hint {
+			Some(ROMType::LoROM) => self.rom.get(0x7FD8).cloned(),
+			Some(ROMType::HiROM) => self.rom.get(0xFFD8).cloned(),
+			None => None,
+		}
 	}
 }
 

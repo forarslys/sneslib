@@ -1,7 +1,7 @@
 use std::sync::atomic::{self, AtomicU8};
 
 use crate::address::Address24;
-use crate::cartridge::Cartridge;
+use crate::cartridge::{Cartridge, ROMType};
 
 const PAGE_SIZE: usize = 64 * 1024;
 const MAP_SIZE: usize = 256 * PAGE_SIZE;
@@ -34,7 +34,7 @@ fn new_ram(n: usize) -> RAM {
 }
 
 impl MemoryMap {
-	pub fn from_cartridge(cartridge: Cartridge) -> Self {
+	pub fn from_cartridge(cartridge: Cartridge, hint: Option<ROMType>) -> Self {
 		let wram = new_ram(2 * PAGE_SIZE);
 		let sram = None;
 		let rom = cartridge
@@ -54,29 +54,89 @@ impl MemoryMap {
 			sram,
 		};
 
+		let mut map_info = Vec::new();
+
 		// WRMA
 		// $xx:0000-$xx:1FFF
-		for i in 0..0x40 {
-			memory_map.map(&[
-				MapInfo::WRAM {
-					src: 0,
-					dst: i << 16,
-					len: 0x2000,
-				},
-				MapInfo::WRAM {
-					src: 0,
-					dst: (i | 0x80) << 16,
-					len: 0x2000,
-				},
-			]);
-		}
+		map_info.extend((0x00..=0x3F).chain(0x80..=0xBF).map(|i| MapInfo::WRAM {
+			src: 0,
+			dst: i << 16,
+			len: 0x2000,
+		}));
 
 		// $7E-$7F
-		memory_map.map(&[MapInfo::WRAM {
+		map_info.push(MapInfo::WRAM {
 			src: 0,
 			dst: 0x7E0000,
-			len: 2 * PAGE_SIZE,
-		}]);
+			len: memory_map.wram.len(),
+		});
+
+		match hint {
+			Some(ROMType::LoROM) => {
+				assert!(memory_map.rom.len() <= 0x400000);
+				// ROM
+				map_info.extend(
+					(0x00..=0x7D)
+						.chain(0x80..=0xFF)
+						.filter(|&i| (i & 0x7F) * 0x8000 < memory_map.rom.len())
+						.map(|i| MapInfo::ROM {
+							src: (i & 0x7F) * 0x8000,
+							dst: i << 16 | 0x8000,
+							len: 0x8000,
+						}),
+				);
+
+				if let Some(sram_size) = memory_map.sram.as_ref().map(|sram| sram.len()) {
+					// with SRAM
+					if sram_size <= 0x8000 {
+						// small SRAM
+						map_info.extend(
+							(0x70..=0x7D)
+								.chain(0xF0..=0xFF)
+								.flat_map(|i| (i << 16..i << 16 | 0x8000).step_by(sram_size))
+								.map(|dst| MapInfo::SRAM {
+									src: 0,
+									dst,
+									len: sram_size,
+								}),
+						);
+					} else {
+						// large SRAM
+						map_info.extend(
+							(0x700000..=0x7DFFFF)
+								.chain(0xF00000..=0xFFFFFF)
+								.step_by(sram_size)
+								.map(|dst| MapInfo::SRAM {
+									src: 0,
+									dst,
+									len: sram_size,
+								}),
+						);
+					}
+				} else {
+					// without SRAM
+					// ROM mirror
+					map_info.extend(
+						(0x40..=0x7D)
+							.chain(0xC0..=0xFF)
+							.filter(|&i| (i & 0x7F) * 0x8000 < memory_map.rom.len())
+							.map(|i| MapInfo::ROM {
+								src: (i & 0x7F) * 0x8000,
+								dst: i << 16,
+								len: 0x8000,
+							}),
+					);
+				}
+			}
+			Some(ROMType::HiROM) => {
+				todo!()
+			}
+			None => {
+				todo!()
+			}
+		}
+
+		memory_map.map(&map_info);
 
 		memory_map
 	}
