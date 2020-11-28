@@ -129,7 +129,42 @@ impl MemoryMap {
 				}
 			}
 			Some(ROMType::HiROM) => {
-				todo!()
+				assert!(memory_map.sram.as_ref().map(|sram| sram.len()).unwrap_or(0) <= 0x2000);
+				// ROM
+				map_info.extend(
+					(0x00..=0x3F)
+						.chain(0x80..=0xBF)
+						.filter(|&i| (i & 0x3F) << 16 | 0x8000 < memory_map.rom.len())
+						.map(|i| MapInfo::ROM {
+							src: (i & 0x3F) << 16 | 0x8000,
+							dst: i << 16 | 0x8000,
+							len: 0x8000,
+						}),
+				);
+				map_info.extend(
+					(0x40..=0x7D)
+						.chain(0xC0..=0xFF)
+						.filter(|&i| (i & 0x3F) << 16 < memory_map.rom.len())
+						.map(|i| MapInfo::ROM {
+							src: (i & 0x3F) << 16,
+							dst: i << 16,
+							len: 0x10000,
+						}),
+				);
+
+				if let Some(sram_size) = memory_map.sram.as_ref().map(|sram| sram.len()) {
+					// with SRAM
+					map_info.extend(
+						(0x20..=0x3F)
+							.chain(0xA0..=0xBF)
+							.flat_map(|i| (i << 16 | 0x6000..i << 16 | 0x8000).step_by(sram_size))
+							.map(|dst| MapInfo::SRAM {
+								src: 0,
+								dst,
+								len: sram_size,
+							}),
+					);
+				}
 			}
 			None => {
 				todo!()
